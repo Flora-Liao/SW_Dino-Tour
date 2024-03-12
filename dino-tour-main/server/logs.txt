@@ -1,0 +1,57 @@
+1687179740 ERROR  Error: Property 'InChange' doesn't exist.
+    at /home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:166:19
+    at String.replace (<anonymous>)
+    at Object.object (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:146:22)
+    at Object.formatQuery (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:300:29)
+    at Database.$query (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/query.js:129:40)
+    at Database.<anonymous> (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/query.js:277:23)
+    at /home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/database.js:333:42
+    at processTicksAndRejections (node:internal/process/task_queues:96:5)
+1687199153 ERROR  Error: @toggleVote:Required: userId, scheduleId, vote
+    at /home/yju/Desktop/dino-tour/server/src/routers/explore/explore.js:126:25
+    at Layer.handle [as handle_request] (/home/yju/Desktop/dino-tour/server/node_modules/express/lib/router/layer.js:95:5)
+    at next (/home/yju/Desktop/dino-tour/server/node_modules/express/lib/router/route.js:144:13)
+    at Route.dispatch (/home/yju/Desktop/dino-tour/server/node_modules/express/lib/router/route.js:114:3)
+    at Layer.handle [as handle_request] (/home/yju/Desktop/dino-tour/server/node_modules/express/lib/router/layer.js:95:5)
+    at /home/yju/Desktop/dino-tour/server/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/home/yju/Desktop/dino-tour/server/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/yju/Desktop/dino-tour/server/node_modules/express/lib/router/index.js:280:10)
+    at module.exports (/home/yju/Desktop/dino-tour/server/src/middleware/access-controller.js:20:3)
+    at Layer.handle [as handle_request] (/home/yju/Desktop/dino-tour/server/node_modules/express/lib/router/layer.js:95:5)
+1687199486 ERROR  Error: Property 'InChange' doesn't exist.
+    at /home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:166:19
+    at String.replace (<anonymous>)
+    at Object.object (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:146:22)
+    at Object.formatQuery (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:300:29)
+    at Database.$query (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/query.js:129:40)
+    at Database.<anonymous> (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/query.js:277:23)
+    at /home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/database.js:333:42
+    at processTicksAndRejections (node:internal/process/task_queues:96:5)
+1687200659 ERROR  Error: Property 'InChange' doesn't exist.
+    at /home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:166:19
+    at String.replace (<anonymous>)
+    at Object.object (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:146:22)
+    at Object.formatQuery (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:300:29)
+    at Database.$query (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/query.js:129:40)
+    at Database.<anonymous> (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/query.js:277:23)
+    at /home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/database.js:333:42
+    at processTicksAndRejections (node:internal/process/task_queues:96:5)
+1687200726 ERROR  Error: Property 'InChange' doesn't exist.
+    at /home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:166:19
+    at String.replace (<anonymous>)
+    at Object.object (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:146:22)
+    at Object.formatQuery (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/formatting.js:300:29)
+    at Database.$query (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/query.js:129:40)
+    at Database.<anonymous> (/home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/query.js:277:23)
+    at /home/yju/Desktop/dino-tour/server/node_modules/pg-promise/lib/database.js:333:42
+    at processTicksAndRejections (node:internal/process/task_queues:96:5)
+1687225591 ERROR  error: relation "users" does not exist
+    at Parser.parseErrorMessage (/home/yju/Desktop/dino-tour/server/node_modules/pg-protocol/dist/parser.js:287:98)
+    at Parser.handlePacket (/home/yju/Desktop/dino-tour/server/node_modules/pg-protocol/dist/parser.js:126:29)
+    at Parser.parse (/home/yju/Desktop/dino-tour/server/node_modules/pg-protocol/dist/parser.js:39:38)
+    at Socket.<anonymous> (/home/yju/Desktop/dino-tour/server/node_modules/pg-protocol/dist/index.js:11:42)
+    at Socket.emit (node:events:390:28)
+    at addChunk (node:internal/streams/readable:315:12)
+    at readableAddChunk (node:internal/streams/readable:289:9)
+    at Socket.Readable.push (node:internal/streams/readable:228:10)
+    at TCP.onStreamRead (node:internal/stream_base_commons:199:23)

@@ -1,0 +1,1949 @@
+CREATE OR REPLACE FUNCTION ListFollowingUsersById (
+    UserId_p            INT
+)
+RETURNS TABLE (
+    UserAccount         TEXT
+)
+AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT 
+        Users.UserAccount
+    FROM
+        Users
+    WHERE
+        IsFollowing(UserId_p, Users.UserAccount)
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListFollowingUsersByAccount (
+    UserAccount_p               TEXT
+)
+RETURNS TABLE (
+    UserAccount                 TEXT
+)
+AS $$
+DECLARE
+    UserId_p   INT;
+BEGIN
+    UserId_p = (SELECT Account2Id(UserAccount_p));
+    RETURN QUERY 
+    SELECT 
+        Users.UserAccount
+    FROM
+        Users
+    WHERE
+        IsFollowing(UserId_p, Users.UserAccount)
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListMembers (
+    ScheduleId_p        INT
+)
+RETURNS TABLE (
+    UserAccount         TEXT
+)
+AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT 
+        Users.UserAccount
+    FROM
+        Users
+    WHERE
+        IsMember(Users.UserId, ScheduleId_p)
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetNumOfInCharges (
+    CreditId_p      INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    ret INT;
+BEGIN
+    SELECT
+        COUNT(*)
+    INTO
+        ret
+    FROM
+        InCharges
+    WHERE
+        InCharges.CreditId = CreditId_p
+    ;
+    RETURN COALESCE(ret, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListAllCredits (
+    ScheduleId_p       INT
+)
+RETURNS TABLE (
+    CreditId_o  INT
+)
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        CreditId
+    FROM
+        Credits
+    WHERE
+        ScheduleId = ScheduleId_p
+    ORDER BY
+        CreateDate
+    ASC
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION IsCleanedUp (
+    UserId_p                INT,
+    ScheduleId_p            INT
+)
+RETURNS BOOLEAN
+AS $$
+DECLARE
+    Payed INT;
+    Owed INT;
+    ViewingId_p INT;
+BEGIN
+    RETURN EXISTS (SELECT
+        GetSumOfDebt(UserId_p, Id2Account(Members.UserId), ScheduleId_p)
+    FROM
+        Members
+    WHERE
+        Members.ScheduleId = ScheduleId_p
+        AND NOT GetSumOfDebt(UserId_p, Id2Account(Members.UserId), ScheduleId_p) = 0
+    );
+END; 
+$$ LANGUAGE plpgsql
+;
+CREATE OR REPLACE FUNCTION GetNotifications (
+    UserId_p                INT
+)
+RETURNS SETOF Notifications
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        *
+    FROM
+        Notifications
+    WHERE
+        UserId = UserId_p
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListOwnedSchedules (
+    UserId_p                INT
+)
+RETURNS TABLE (
+    ScheduleId_o    INT
+)
+AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT 
+        ScheduleId
+    FROM
+        Schedules AS s
+    WHERE
+        s.ownerid = UserId_p
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListArchivedSchedules (
+    UserId_p            INT
+)
+RETURNS TABLE (
+    ScheduleId_o    INT
+)
+AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT 
+        Schedules.ScheduleId
+    FROM
+        Schedules 
+    JOIN
+        Archives
+    ON 
+        Schedules.ScheduleId = Archives.ScheduleId
+    WHERE
+        Archives.UserId = UserId_p
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListVisibleSchedules (
+    UserId_p            INT
+)
+RETURNS TABLE (
+    ScheduleId_o    INT
+)
+AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT 
+        Schedules.ScheduleId
+    FROM
+        Schedules 
+    JOIN
+        Members
+    ON 
+        Schedules.ScheduleId = Members.ScheduleId
+    WHERE
+        Members.UserId = UserId_p
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListNotes (
+    ScheduleId_p                INT
+)
+RETURNS TABLE (
+    NoteId      INT
+)
+AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT 
+        id
+    FROM
+        Notes
+    WHERE
+        ScheduleId = ScheduleId_p
+    ORDER BY
+        CreateTimeStamp
+    ASC
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListEventsOnDay (
+    UserId_p            INT,
+    ScheduleId_p        INT,
+    OnDay_p             INT
+)
+RETURNS TABLE (
+    EventId             INT
+)
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        Events.EventId
+    FROM
+        Events
+    LEFT JOIN
+        EventCosts
+    ON
+        Events.EventId = EventCosts.EventId
+    WHERE
+        Events.ScheduleId = ScheduleId_p
+        AND Events.EventOnDay = OnDay_p
+        AND (EventCosts.UserId = UserId_p 
+             OR EventCosts.UserId IS NULL)
+    ORDER BY
+        EventOrder
+    ASC
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListEvents (
+    UserId_p            INT,
+    ScheduleId_p        INT
+)
+RETURNS TABLE (
+    EventId             INT
+)
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        Events.EventId
+    FROM
+        Events
+    LEFT JOIN
+        EventCosts
+    ON
+        Events.EventId = EventCosts.EventId
+    WHERE
+        Events.ScheduleId = ScheduleId_p
+        AND (EventCosts.UserId = UserId_p 
+             OR EventCosts.UserId IS NULL)
+    ORDER BY
+        (EventOnDay, EventOrder)
+    ASC
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListUsersByAccount (
+    KeyWord             TEXT
+)
+RETURNS TABLE (
+    UserAccount_o       TEXT
+)
+AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT 
+        UserAccount
+    FROM
+        Users
+    WHERE
+        UserAccount ILIKE FORMAT('%%%s%%',Keyword)
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;/*
+Vote_p = {'Economic', 'Delicious', 'Popular', ''}, '' would compare by sum of all votes
+*/
+CREATE OR REPLACE FUNCTION ListPublicSchedules (
+    KeyWord            TEXT,
+    Vote_p             TEXT
+)
+RETURNS TABLE (
+    ScheduleId_o    INT
+)
+AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT 
+        Schedules.ScheduleId
+    FROM
+        Schedules 
+    LEFT JOIN 
+        Votes
+    ON 
+        Schedules.ScheduleId = Votes.ScheduleId
+        AND (Vote_p = '' OR Votes.Vote = Vote_p)
+        AND (KeyWord = '' OR ScheduleName ILIKE FORMAT('%%%s%%', KeyWord))
+    WHERE
+        Schedules.Public = TRUE
+    GROUP BY 
+        Schedules.ScheduleId
+    ORDER BY 
+        COUNT(Votes.id)
+    DESC
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListSchedulesByAccount (
+    UserAccount_p      TEXT
+)
+RETURNS TABLE (
+    ScheduleId_o    INT
+)
+AS $$
+DECLARE
+    UserId_p INT;
+BEGIN
+    UserId_p = (SELECT Account2Id(UserAccount_p));
+
+    RETURN QUERY 
+    SELECT 
+        ScheduleId
+    FROM
+        Schedules 
+    WHERE
+        OwnerId = UserId_p
+        AND Public = TRUE
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetNumOfFollowers (
+    UserAccount_p      TEXT
+)
+RETURNS INT
+AS $$
+DECLARE
+    UserId_p INT;
+    NumOfFollowers INT;
+BEGIN
+    UserId_p = (SELECT Account2Id(UserAccount_p));
+
+    SELECT 
+        COUNT(Followings.id)
+    FROM
+        Users
+    LEFT JOIN
+        Followings
+    ON
+        Users.UserId = Followings.FollowingId
+    GROUP BY
+        Users.UserId
+    HAVING
+        Users.UserId = UserId_p
+    INTO
+        NumOfFollowers
+    ;
+
+    RETURN COALESCE(NumOfFollowers, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetNumOfScheduleArchived (
+    UserAccount_p      TEXT
+)
+RETURNS INT
+AS $$
+DECLARE
+    UserId_p INT;
+    NumOfScheduleArchived INT;
+BEGIN
+    UserId_p = (SELECT Account2Id(UserAccount_p));
+    
+    SELECT
+        COUNT(*)
+    INTO 
+        NumOfScheduleArchived
+    FROM
+        Archives
+    JOIN
+        Schedules
+    ON
+        Schedules.ScheduleId = Archives.ScheduleId
+    WHERE
+        Schedules.OwnerId = UserId_p
+    ;
+    RETURN COALESCE(NumOfScheduleArchived, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetNumOfPublicSchedules (
+    UserAccount_p      TEXT
+)
+RETURNS INT
+AS $$
+DECLARE
+    UserId_p INT;
+    NumOfPublicSchedules INT;
+BEGIN
+    UserId_p = (SELECT Account2Id(UserAccount_p));
+
+    SELECT 
+        COUNT(ScheduleId)
+    FROM
+        Users
+    LEFT JOIN
+        Schedules
+    ON
+        Users.UserId = Schedules.OwnerId
+    GROUP BY
+        Users.UserId
+    HAVING
+        Users.UserId = UserId_p
+    INTO
+        NumOfPublicSchedules
+    ;
+    RETURN COALESCE(NumOfPublicSchedules, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetNumOfFollowings (
+    UserAccount_p      TEXT
+)
+RETURNS INT
+AS $$
+DECLARE
+    UserId_p INT;
+    NumOfFollowings INT;
+BEGIN
+    UserId_p = (SELECT Account2Id(UserAccount_p));
+
+    SELECT 
+        COUNT(Followings.id)
+    FROM
+        Users
+    LEFT JOIN
+        Followings
+    ON
+        Users.UserId = Followings.UserId
+    GROUP BY
+        Users.UserId
+    HAVING
+        Users.UserId = UserId_p
+    INTO
+        NumOfFollowings
+    ;
+
+    RETURN COALESCE(NumOfFollowings, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ListTags (
+    ScheduleId_p                INT
+)
+RETURNS TABLE (
+    TagId      INT
+)
+AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT 
+        id
+    FROM
+        Tags
+    WHERE
+        ScheduleId = ScheduleId_p
+    ORDER BY
+        id
+    ASC
+    ;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetRank(
+    UserAccount_p       TEXT,
+    Vote_p              TEXT
+)
+RETURNS INT
+AS $$
+DECLARE
+    UserId_p    INT;
+    ret INT;
+BEGIN
+    UserId_p = (SELECT Account2Id(UserAccount_p));
+    SELECT
+        SUM(GetVotes(ScheduleId, Vote_p))
+    INTO
+        ret
+    FROM
+        Schedules
+    WHERE
+        OwnerId = UserId_p
+    ;
+    RETURN COALESCE(ret, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetSumOfDebt (
+    UserId_p                INT,
+    ViewingAccount_p        TEXT,
+    ScheduleId_p            INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    Payed INT;
+    Owed INT;
+    ViewingId_p INT;
+BEGIN
+    ViewingId_p = (SELECT Account2Id(ViewingAccount_p));
+    SELECT
+        SUM(Amount / GetNumOfInCharges(Credits.CreditId))
+    INTO
+        Payed
+    FROM
+        Credits
+    WHERE
+        Credits.ScheduleId = ScheduleId_p
+        AND Credits.UserId = UserId_p
+        AND
+        EXISTS (
+            SELECT * FROM InCharges WHERE InCharges.UserId = ViewingId_p AND InCharges.CreditId = Credits.CreditId
+        )
+    ;
+    SELECT
+        SUM(Amount / GetNumOfInCharges(Credits.CreditId))
+    INTO
+        Owed
+    FROM
+        Credits
+    WHERE
+        Credits.ScheduleId = ScheduleId_p
+        AND Credits.UserId = ViewingId_p
+        AND
+        EXISTS (
+            SELECT * FROM INCharges WHERE InCharges.UserId = UserId_p AND InCharges.CreditId = Credits.CreditId
+        )
+    ;
+    RETURN COALESCE(Owed, 0) - COALESCE(Payed, 0);
+END; 
+$$ LANGUAGE plpgsql
+;
+CREATE OR REPLACE FUNCTION GetBudget(
+    UserId_p            INT,
+    ScheduleId_p        INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    ret INT;
+BEGIN
+    SELECT
+        Budget
+    INTO
+        ret
+    FROM
+        Members
+    WHERE
+        ScheduleId = ScheduleId_p
+        AND UserId = UserId_p
+    ;
+    RETURN COALESCE(ret, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetNumOfArchives (
+    ScheduleId_p       INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    NumOfArchives INT;
+BEGIN
+    SELECT 
+        COUNT(Archives.id)
+    FROM
+        Archives
+    WHERE
+        ScheduleId = ScheduleId_p
+    INTO
+        NumOfArchives
+    ;
+    RETURN COALESCE(NumOfArchives, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetVotes (
+    ScheduleId_p        INT,
+    Vote_p              TEXT
+)
+RETURNS INT
+AS $$
+DECLARE
+    ret         INT;
+BEGIN
+    SELECT
+        COUNT(*)
+    INTO
+        ret
+    FROM
+        Votes
+    WHERE
+        ScheduleId = ScheduleId_p
+        AND
+        (Vote_p = '' OR Vote_p = Vote)
+    ;
+    RETURN COALESCE(ret, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetPredictedCost (
+    UserId_p            INT,
+    ScheduleId_p        INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    PredictedCost INT;
+BEGIN
+    SELECT
+        SUM(Cost)
+    INTO
+        PredictedCost
+    FROM
+        Events
+    LEFT JOIN
+        EventCosts
+    ON
+        Events.EventId = EventCosts.EventId
+    WHERE
+        EventCosts.Cost IS NOT NULL
+        AND EventCosts.UserId = UserId_p
+    ;
+    RETURN COALESCE(PredictedCost,0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetBudget (
+    UserId_p            INT,
+    ScheduleId_p        INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    Budget_p INT;
+BEGIN
+    SELECT
+        Budget
+    INTO
+        Budget_p
+    FROM
+        Members
+    WHERE
+        ScheduleId = ScheduleId_p
+        AND UserId = UserId_p
+    ;
+    RETURN COALESCE(Budget, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION GetSumOfCredits (
+    UserAccount_p      TEXT,
+    ScheduleId_p       INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    UserId_p INT;
+    SumOfCredits INT;
+BEGIN
+    UserId_p = (SELECT Account2Id(UserAccount_p));
+    
+    SELECT 
+        SUM(Credits.Amount)
+    FROM
+        Credits
+    WHERE
+        Credits.UserId = UserId_p
+        AND Credits.ScheduleId = ScheduleId_p
+        AND Credits.Stat = FALSE
+    INTO SumOfCredits
+    ;
+    RETURN COALESCE(SumOfCredits, 0);
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION IsOwner (
+    UserId_p           INT,
+    ScheduleId_p       INT
+)
+RETURNS BOOLEAN
+AS $$
+BEGIN
+    IF EXISTS (
+        SELECT
+            *
+        FROM
+            Schedules
+        WHERE
+            OwnerId = UserId_p
+            AND ScheduleId = ScheduleId_p
+    ) THEN
+        RETURN TRUE;
+    END IF;
+    
+    RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION Login (
+    UserAccount_p      VARCHAR(20),
+    UserPassword_p     VARCHAR(20)
+)
+RETURNS INT
+AS $$
+DECLARE
+    id INT;
+BEGIN
+    IF NOT EXISTS (SELECT * FROM Users WHERE UserAccount = UserAccount_p) 
+    THEN
+        RETURN -1;
+    END IF;
+    SELECT
+        UserId
+    FROM
+        Users
+    WHERE
+        UserAccount = UserAccount_p
+        AND UserPassword = UserPassword_p
+    INTO
+        id
+    ;
+    RETURN COALESCE(id, -2);
+END; 
+$$ LANGUAGE plpgsql
+;/*
+Transform UserAccount to UserId
+*/
+CREATE OR REPLACE FUNCTION Account2Id (
+    UserAccount_p      VARCHAR(20)
+)
+RETURNS INT
+AS $$
+DECLARE
+    id INT;
+BEGIN
+    SELECT 
+        UserId INTO id 
+    FROM 
+        Users 
+    WHERE 
+        UserAccount = UserAccount_p
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION IsFollowing (
+    UserId_p           INT,
+    FollowingAccount_p VARCHAR(20)
+)
+RETURNS BOOLEAN
+AS $$
+DECLARE
+    FollowingId_p INT;
+BEGIN
+    FollowingId_p = (SELECT Account2Id(FollowingAccount_p));
+    IF EXISTS (
+        SELECT
+            *
+        FROM
+            Followings
+        WHERE
+            UserId = UserId_p
+            AND FollowingId = FollowingId_p
+    ) THEN
+        RETURN TRUE;
+    END IF;
+    
+    RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION IsMember (
+    UserId_p           INT,
+    ScheduleId_p       INT
+)
+RETURNS BOOLEAN
+AS $$
+BEGIN
+    IF EXISTS (
+        SELECT
+            *
+        FROM
+            Members
+        WHERE
+            UserId = UserId_p
+            AND ScheduleId = ScheduleId_p
+    ) THEN
+        RETURN TRUE;
+    END IF;
+    
+    RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql
+;/*
+Transform UserId to UserAccount
+*/
+CREATE OR REPLACE FUNCTION Id2Account (
+    UserId_p        INT
+)
+RETURNS VARCHAR(20)
+AS $$
+DECLARE
+    Account VARCHAR(20);
+BEGIN
+    SELECT 
+        UserAccount
+    INTO
+        Account
+    FROM 
+        Users 
+    WHERE 
+        UserId = UserId_p
+    ;
+    RETURN Account;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ToggleFollowing (
+    UserId_p           INT,
+    FollowingAccount_p TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    IF EXISTS (SELECT * FROM Followings WHERE UserId = UserId_p AND FollowingId = Account2Id(FollowingAccount_p))
+    THEN
+        DELETE FROM
+            Followings
+        WHERE
+            UserId = UserId_p
+            AND FollowingId = Account2Id(FollowingAccount_p)
+        RETURNING Votes.id INTO id
+        ;
+    ELSE
+        INSERT INTO
+            Followings (UserId, FollowingId)
+        VALUES
+            (UserId_p, Account2Id(FollowingAccount_p))
+        RETURNING Followings.id INTO id
+        ;
+    END IF
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION NewMember (
+    UserId_p           INT,
+    MemberAccount_p    TEXT,
+    ScheduleId_p       INT,
+    Budget_p           INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    MemberId_p INT;
+    id INT;
+BEGIN
+    MemberId_p = (SELECT Account2Id(MemberAccount_p));
+
+    IF (IsOwner(UserId_p, ScheduleId_p)) 
+    THEN
+        INSERT INTO 
+            Members (ScheduleId, UserId, Budget)
+        VALUES 
+            (ScheduleId_p,  MemberId_p, Budget_p)
+        RETURNING Members.id INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION NewArchive (
+    UserId_p           INT,
+    ScheduleId_p       INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    IF NOT (IsOwner(UserId_p, ScheduleId_p)) 
+    THEN
+        INSERT INTO 
+            Archives(UserId, ScheduleId)
+        VALUES 
+            (UserId_p, ScheduleId_p)
+        RETURNING Archives.id INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION NewVote (
+    UserId_p           INT,
+    ScheduleId_p       INT,
+    Vote_p             TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN    
+    INSERT INTO
+        Votes (UserId, ScheduleId, Vote, Stamp)
+    VALUES
+        (UserId_p, ScheduleId_p, Vote_p, current_timestamp)
+    RETURNING Votes.id INTO id
+    ;
+    
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION NewFollowing (
+    UserId_p           INT,
+    FollowingAccount_p TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    FollowingId_p INT;
+    id INT;
+BEGIN
+    FollowingId_p = (SELECT Account2Id(FollowingAccount_p));
+    
+    INSERT INTO
+        Followings (UserId, FollowingId)
+    VALUES
+        (UserId_p, FollowingId_p)
+    RETURNING Followings.id INTO id;
+    
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION NewEventCost (
+    UserId_p           INT,
+    EventId_p          INT,
+    Cost_p             INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    INSERT INTO 
+        EventCosts (UserId, EventId, Cost) 
+    VALUES 
+        (UserId_p, EventId_p, Cost_p) 
+    RETURNING EventCosts.id INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION NewSchedule (
+    UserId_p                INT,
+    ScheduleName_p          TEXT,
+    StartDate_p             DATE,
+    EndDate_p               DATE,
+    Public_p                BOOLEAN,
+    HasCredits_p            BOOLEAN,
+
+    Budget_p                INT,
+    InitMemberAccounts_p    TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+    r RECORD;
+    NumOfDays INT;
+    D INT;
+    trash INT;
+BEGIN
+    INSERT INTO 
+        Schedules (OwnerId, ScheduleName, ScheduleDescription, ScheduleImage, StartDate, EndDate, Public, HasCredits, CreateTimeStamp)
+    VALUES 
+        (UserId_p, ScheduleName_p, '', '', StartDate_p, EndDate_p, Public_p, HasCredits_p, current_timestamp)
+    RETURNING ScheduleId INTO id
+    ;
+    -- Adding Initial Members' memberships, with budget = Budget_p
+    FOR r IN
+        SELECT unnest(
+            string_to_array(InitMemberAccounts_p, ',')
+        ) AS InitMemberAccount
+    LOOP
+        trash = (SELECT NewMember(UserId_p, r.InitMemberAccount, id, Budget_p));
+    END LOOP
+    ;
+    -- Adding StartTimes for this schedule
+    NumOfDays = (SELECT EndDate_p - StartDate_p);
+    FOR D IN 1..NumOfDays
+    LOOP
+        INSERT INTO
+            ScheduleStartTimes (ScheduleId, OnDay, StartTime)
+        VALUES
+            (id, D, '08:00:00')
+        ;
+    END LOOP
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION NewEvent (
+    UserId_p            INT,
+    ScheduleId_p        INT,
+    EventOnDay_p        INT,
+    EventOrder_p        INT,
+    StayTime_p          TIME,
+    EventName_p         TEXT,
+    EventPhoto_p        TEXT,
+    Info_p              TEXT,
+    Traffic_p           TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    --RAISE NOTICE '%, %, %', EventOnDay_p, EventOrder_p, ScheduleId_p; 
+    IF (SELECT IsMember(UserId_p, ScheduleId_p))
+    THEN
+        UPDATE
+            Events
+        SET
+            EventOrder = EventOrder + 1
+        WHERE
+            EventOrder >= EventOrder_p
+            AND ScheduleId = ScheduleId_p
+            AND EventOnDay = EventOnDay_p
+        ;
+        INSERT INTO 
+            Events (ScheduleId, EventOnDay, EventOrder, StayTime, EventName, EventPhoto, Info, Traffic) 
+        VALUES 
+            (ScheduleId_p, EventOnDay_p, EventOrder_p, StayTime_p, EventName_p, EventPhoto_p, Info_p, Traffic_p)
+        RETURNING Events.EventId INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION NewTag (
+    UserId_p            INT,
+    ScheduleId_p        INT,
+    Tag_p               TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN    
+    IF (SELECT IsMember(UserId_p, ScheduleId_p))
+    THEN
+        INSERT INTO
+            Tags (ScheduleId, Tag)
+        VALUES
+            (ScheduleId_p, Tag_p)
+        RETURNING Tags.ScheduleId INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION NewCredit (
+    ScheduleId_p        INT,
+    PayerId_p           INT,
+    Amount_p            INT,
+    Description_p       TEXT,
+    InCharge_p          TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+    InChargeId INT;
+    r RECORD;
+BEGIN    
+    INSERT INTO
+        Credits (ScheduleId, UserId, Amount, Stat, Description, CreateDate)
+    VALUES
+        (ScheduleId_p, PayerId_p, Amount_p, FALSE, Description_p, current_date)
+    RETURNING Credits.CreditId INTO id
+    ;
+    
+    FOR r IN
+        SELECT unnest(
+            string_to_array(InCharge_p, ',')
+        ) AS InChargeAccount
+    LOOP
+        InChargeId = (SELECT Account2Id(r.InChargeAccount));
+
+        INSERT INTO
+            InCharges (UserId, CreditId)
+        VALUES
+            (InChargeId, id)
+        ;
+    END LOOP
+    ;
+
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION NewNote (
+    UserId_p           INT,
+    ScheduleId_p       INT,
+    Content_p          TEXT,
+    Colour_p           TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    IF (SELECT IsMember(UserId_p, ScheduleId_p))
+    THEN
+        INSERT INTO 
+            Notes (ScheduleId, UserId, Content, Colour, CreateTimeStamp) 
+        VALUES 
+            (ScheduleId_p, UserId_p, Content_p, Colour_p, current_timestamp)
+        RETURNING Notes.id INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;/*
+RETURNS UserId 
+*/
+CREATE OR REPLACE FUNCTION NewUser (
+    UserAccount_p      TEXT,
+    UserName_p         TEXT,
+    UserPassword_p     TEXT
+)
+RETURNS INT
+AS $$
+DECLARE
+    id INT;
+BEGIN
+    INSERT INTO 
+        Users (UserAccount, UserName, UserPassword, UserDescription, UserBackgroundImage, UserPhoto)
+    VALUES 
+        (UserAccount_p, UserName_p, UserPassword_p, '', '', '')
+    RETURNING UserId INTO id
+    ;
+    -- Adding Notifications
+    INSERT INTO
+        Notifications (
+            UserId                      ,
+            GeneralNotification         ,
+            InvitationNotification      , 
+            LoanNotification            ,
+            DebtNotification            ,
+            NewCreditNotification       ,
+            NoteNotification
+        )
+    VALUES
+        (
+            id  ,
+            TRUE,
+            TRUE,
+            TRUE,
+            TRUE,
+            TRUE,
+            TRUE
+        )
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ToggleArchive (
+    UserId_p           INT,
+    ScheduleId_p       INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    IF EXISTS (SELECT * FROM Archives WHERE UserId = UserId_p AND ScheduleId = ScheduleId_p)
+    THEN
+        DELETE FROM
+            Archives
+        WHERE
+            UserId = UserId_p
+            AND ScheduleId = ScheduleId_p
+        RETURNING Archives.id INTO id
+        ;
+    ELSE
+        INSERT INTO
+            Archives (UserId, ScheduleId)
+        VALUES
+            (UserId_p, ScheduleId_p)
+        RETURNING Archives.id INTO id
+        ;
+    END IF
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteEventsOnDay (
+    UserId_p                INT,
+    ScheduleId_p            INT,
+    EventOnDay_p            INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    id INT;
+BEGIN
+    IF (SELECT IsMember(UserId_p, ScheduleId_p))
+    THEN
+        DELETE FROM
+            Events
+        WHERE
+            ScheduleId = ScheduleId_p
+            AND EventOnDay = EventOnDay_p
+        RETURNING EventId INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteSchedule (
+    UserId_p           INT,
+    ScheduleId_p       INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    IF (SELECT IsOwner(UserId_p, ScheduleId_p))
+    THEN
+        DELETE FROM
+            Schedules
+        WHERE
+            ScheduleId = ScheduleId_p
+        RETURNING ScheduleId INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteMember (
+    UserId_p           INT,
+    MemberAccount_p    TEXT,
+    ScheduleId_p       INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    MemberId_p INT;
+    id INT;
+BEGIN
+    MemberId_p = (SELECT Account2Id(MemberAccount_p));
+
+    IF (IsOwner(UserId_p, ScheduleId_p)) 
+    THEN
+        DELETE FROM
+            Members
+        WHERE
+            UserId = MemberId_p
+            AND ScheduleId = ScheduleId_p
+        RETURNING Members.id INTO id
+        ;
+        DELETE FROM
+            EventCosts
+        WHERE
+            UserId = MemberId_p
+            AND 
+            EXISTS (
+                SELECT 
+                    *
+                FROM
+                    Events
+                WHERE
+                    Events.EventId = EventCosts.EventId
+                    AND Events.ScheduleId = ScheduleId_p
+            )
+        ;
+        /*
+        Delete related data or not?
+        */
+        /*
+        DELETE FROM
+            Credits
+        WHERE
+            UserId = MemberId_p
+            ANd ScheduleId = ScheduleId_p
+        ;
+        */
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteTag (
+    id_p                INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN    
+    DELETE FROM
+        Tags
+    WHERE
+        Tags.id = id_p
+    RETURNING Tags.id INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteCredit (
+    CreditId_p         INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN    
+    DELETE FROM
+        Credits
+    WHERE
+        CreditId = CreditId_p
+    RETURNING CreditId INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteNote (
+    id_p               INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    DELETE FROM
+        Notes
+    WHERE
+        Notes.id = id_p
+    RETURNING Notes.id INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteArchive (
+    UserId_p           INT,
+    ScheduleId_p       INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    DELETE FROM
+        Archives
+    WHERE
+        UserId = UserId_p
+        AND ScheduleId = ScheduleId_p
+    RETURNING Archives.id INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteUser (
+    UserId_p           INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    id INT;
+BEGIN
+    DELETE FROM
+        Users
+    WHERE
+        UserId = UserId_p
+    RETURNING UserId INTO id
+    ;
+    RETURN id;
+END; $$
+LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteVote (
+    UserId_p           INT,
+    ScheduleId_p       INT,
+    Vote_p             TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN    
+    DELETE FROM
+        Votes
+    WHERE
+        UserId = UserId_p
+        AND ScheduleId = ScheduleId_p
+        AND Vote = Vote_p
+    RETURNING Votes.id INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteFollowing (
+    UserId_p           INT,
+    FollowingAccount_p TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    FollowingId_p INT;
+    id INT;
+BEGIN
+    FollowingId_p = (SELECT Account2Id(FollowingAccount_p));
+    
+    DELETE FROM
+        Followings
+    WHERE
+        UserId = UserId_p
+        AND FollowingId = FollowingId_p
+    RETURNING Followings.id INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION DeleteEvent (
+    EventId_p           INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    EventOnDay_p INT;
+    EventOrder_p INT;
+    ScheduleId_p INT;
+    id INT;
+BEGIN
+    SELECT
+        EventOnDay, EventOrder, ScheduleId
+    INTO
+        EventOnDay_p, EventOrder_p, ScheduleId_p
+    FROM
+        Events
+    WHERE
+        EventId = EventId_p
+    ;
+    UPDATE 
+        Events
+    SET
+        EventOrder = EventOrder - 1
+    WHERE
+        EventOrder > EventOrder_p
+        AND EventOnDay = EventOnDay_p
+        AND ScheduleId = ScheduleId_p
+    ;   
+    DELETE FROM
+        Events
+    WHERE
+        EventId = EventId_p
+    RETURNING EventId INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateScheduleImage (
+    UserId_p                    INT,
+    ScheduleId_p                INT,
+    ScheduleImage_p             TEXT
+)
+RETURNS INT
+AS $$
+DECLARE
+    id INT;
+BEGIN
+    IF (SELECT IsMember(UserId_p, ScheduleId_p))
+    THEN
+        UPDATE
+            Schedules
+        SET
+            ScheduleImage = ScheduleImage_p
+        WHERE
+            ScheduleId = ScheduleId_p
+        RETURNING ScheduleId INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateUserPhoto (
+    UserId_p                INT,
+    UserPhoto_p             TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    UPDATE
+        Users
+    SET
+        UserPhoto = UserPhoto_p
+    WHERE
+        UserId = UserId_p
+    RETURNING UserId INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateUserBackgroundImage (
+    UserId_p                    INT,
+    UserBackgroundImage_p       TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    UPDATE
+        Users
+    SET
+        UserBackgroundImage = UserBackgroundImage_p
+    WHERE
+        UserId = UserId_p
+    RETURNING UserId INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateUser (
+    UserId_p           INT,
+    UserName_p         TEXT,
+    UserPassword_p     TEXT
+)
+RETURNS INT
+AS $$
+DECLARE
+    id INT;
+BEGIN
+    UPDATE 
+        Users
+    SET
+        UserName = UserName_p,
+        UserPassword = UserPassword_p
+    WHERE
+        UserId = UserId_p
+    RETURNING UserId INTO id
+    ;
+
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateEventCost (
+    UserId_p           INT,
+    EventId_p          INT,
+    Cost_p             INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    UPDATE
+        EventCosts
+    SET
+        Cost = Cost_p
+    WHERE
+        UserId = UserId_p
+        AND EventId = EventId_p
+    RETURNING EventCosts.id INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateScheduleStartTime (
+    UserId_p           INT,
+    ScheduleId_p       INT,
+    OnDay_p            INT,
+    StartTime_p        TIME
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    IF (SELECT IsMember(UserId_p, ScheduleId_p)) 
+    THEN
+        UPDATE
+            ScheduleStartTimes
+        SET
+            StartTime = StartTime_p
+        WHERE
+            ScheduleId = ScheduleId_p
+            AND OnDay = OnDay_p
+        RETURNING ScheduleId INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateScheduleDescription (
+    UserId_p                INT,
+    ScheduleId_p            INT,
+    ScheduleDescription_p   TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    IF (SELECT IsMember(UserId_p, ScheduleId_p))
+    THEN
+        UPDATE
+            Schedules
+        SET
+            ScheduleDescription = ScheduleDescription_p
+        WHERE
+            ScheduleId = ScheduleId_p
+        RETURNING ScheduleId INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ReOrderEvent (
+    EventId_p          INT,
+    EventOrder_p       INT
+)
+RETURNS INT
+AS $$
+DECLARE
+    OriginalEventOrder INT;
+    ScheduleId_p INT;
+    id INT;
+BEGIN
+    SELECT
+        EventOrder, ScheduleId
+    INTO
+        OriginalEventOrder, ScheduleId_p
+    FROM
+        Events
+    WHERE
+        EventId = EventId_p
+    ;
+    IF (OriginalEventOrder < EventOrder_p)
+    THEN
+        UPDATE
+            Events
+        SET
+            EventOrder = EventOrder - 1
+        WHERE
+            ScheduleId = ScheduleId_p
+            AND EventOrder > OriginalEventOrder
+            AND EventOrder <= EventOrder_p
+        ;
+    ELSE
+        UPDATE
+            Events
+        SET
+            EventOrder = EventOrder+1
+        WHERE
+            ScheduleId = ScheduleId_p
+            ANd EventOrder < OriginalEventOrder
+            AND EventOrder >= EventOrder_p
+        ;
+    END IF;
+    UPDATE 
+        Events
+    SET
+        EventOrder = EventOrder_p
+    WHERE
+        EventId = EventId_p
+    ;
+    RETURN EventOrder_p;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateNote (
+    id_p               INT,
+    Content_p          TEXT,
+    Colour_p           TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    UPDATE
+        Notes
+    SET
+        Content = Content_p,
+        Colour = Colour_p
+    WHERE
+        Notes.id = id_p
+    RETURNING Notes.id INTO id;
+    
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateUserDescription (
+    UserId_p           INT,
+    UserDescription_p  TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    UPDATE
+        Users
+    SET
+        UserDescription = UserDescription_p
+    WHERE
+        UserId = UserId_p
+    RETURNING UserId INTO id
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateMember (
+    UserId_p           INT,
+    ScheduleId_p       INT,
+    Budget_p           INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    IF (IsMember(UserId_p, ScheduleId_p)) 
+    THEN
+        UPDATE
+            Members 
+        SET
+            Budget = Budget_p
+        WHERE
+            ScheduleId = ScheduleId_p
+            AND UserId = UserId_p
+        RETURNING Members.id INTO id
+        ;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateSchedule (
+    UserId_p           INT,
+    ScheduleId_p       INT,
+    ScheduleName_p     TEXT,
+    StartDate_p        DATE,
+    EndDate_p          DATE,
+    Public_p           BOOLEAN
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+    D INT;
+    NumOfDays INT;
+BEGIN
+    IF (SELECT IsMember(UserId_p, ScheduleId_p)) 
+    THEN
+        UPDATE
+            Schedules
+        SET
+            ScheduleName = ScheduleName_p,
+            StartDate = StartDate_p,
+            EndDate = EndDate_p,
+            Public = Public_p
+        WHERE
+            ScheduleId = ScheduleId_p
+        RETURNING ScheduleId INTO id
+        ;
+        /*
+        Deleting Days that are out of bound
+        */
+        NumOfDays = (SELECT EndDate_p - StartDate_p);
+        DELETE FROM
+            ScheduleStartTimes
+        WHERE
+            ScheduleId = ScheduleId_p
+            AND OnDay > NumOfDays
+        ;
+        DELETE FROM
+            Events
+        WHERE
+            ScheduleId = ScheduleId_p
+            AND EventOnDay > NumOfDays
+        ;
+        /*
+        Create new StartTimes (Doesn't matter creating repeated records, keyword unique will handle this for us)
+        */
+        FOR D IN 1..NumOfDays
+        LOOP
+            INSERT INTO
+                ScheduleStartTimes (ScheduleId, OnDay, StartTime)
+            VALUES
+                (ScheduleId_p, D, '08:00:00')
+            ;
+        END LOOP;
+        RETURN id;
+    END IF;
+    RETURN -1;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateEvent (
+    UserId_p            INT,
+    EventId_p           INT,
+    StayTime_p          TIME,
+    Traffic_p           TEXT,
+    Cost_p              INT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    UPDATE
+        Events
+    SET
+        StayTime = StayTime_p,
+        Traffic = Traffic_p
+    WHERE
+        EventId = EventId_p
+    RETURNING EventId INTO id
+    ;
+
+    INSERT INTO
+        EventCosts(EventId, UserId, Cost)
+    VALUES
+        (EventId_p, UserId_p, Cost_p)
+    ;
+    UPDATE
+        EventCosts
+    SET
+        Cost = Cost_p
+    WHERE
+        EventId = EventId_p
+        AND UserId = UserId_p
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateNotifications (
+    UserId_p                        INT,
+    GeneralNotification_p           BOOLEAN,
+    InvitationNotification_p        BOOLEAN, 
+    LoanNotification_p              BOOLEAN,
+    DebtNotification_p              BOOLEAN,
+    NewCreditNotification_p         BOOLEAN,
+    NoteNotification_p              BOOLEAN
+)
+RETURNS INT
+AS $$
+DECLARE
+    id INT;
+BEGIN
+    UPDATE
+        Notifications
+    SET
+        GeneralNotification = GeneralNotification_p,
+        InvitationNotification = InvitationNotification_p,
+        LoanNotification = LoanNotification_p,
+        DebtNotification = DebtNotification_p,
+        NewCreditNotification = NewCreditNotification_p,
+        NoteNotification = NoteNotification_p
+    WHERE
+        UserId = UserId_p
+    RETURNING UserId INTO id
+    ;
+    RETURN id;
+END; $$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION UpdateCredit (
+    CreditId_p         INT,
+    Stat_p             BOOLEAN
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN    
+    UPDATE 
+        Credits
+    SET 
+        Stat = Stat_p
+    WHERE
+        CreditId = CreditId_p
+    RETURNING CreditId INTO id
+    ;
+    RETURN id;  
+END; 
+$$ LANGUAGE plpgsql
+;CREATE OR REPLACE FUNCTION ToggleVote (
+    UserId_p           INT,
+    ScheduleId_p       INT,
+    Vote_p             TEXT
+)
+RETURNS INT
+AS $$
+DECLARE 
+    id INT;
+BEGIN
+    IF EXISTS (SELECT * FROM Votes WHERE UserId = UserId_p AND ScheduleId = ScheduleId_p AND Vote = Vote_p)
+    THEN
+        DELETE FROM
+            Votes
+        WHERE
+            UserId = UserId_p
+            AND ScheduleId = ScheduleId_p
+            AND Vote = Vote_p
+        RETURNING Votes.id INTO id
+        ;
+    ELSE
+        INSERT INTO
+            Votes (UserId, ScheduleId, Vote, Stamp)
+        VALUES
+            (UserId_p, ScheduleId_p, Vote_p, current_timestamp)
+        RETURNING Votes.id INTO id
+        ;
+    END IF
+    ;
+    RETURN id;
+END; 
+$$ LANGUAGE plpgsql
+;
